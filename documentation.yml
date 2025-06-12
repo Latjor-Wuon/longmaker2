@@ -1,0 +1,910 @@
+openapi: 3.0.3
+info:
+  title: JuaJobs API
+  description: |
+    RESTful API for JuaJobs - Africa's Premier Job Marketplace Platform
+    
+    ## Authentication
+    This API uses OAuth 2.0 for authentication. Include the access token in the Authorization header:
+    ```
+    Authorization: Bearer {access_token}
+    ```
+  version: 1.0.0
+  contact:
+    name: JuaJobs API Support
+    email: api@juajobs.com
+    url: https://developers.juajobs.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: https://api.juajobs.com/v1
+    description: Production server
+  - url: https://staging-api.juajobs.com/v1
+    description: Staging server
+  - url: http://localhost:8000/v1
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Authentication
+    description: Authentication and authorization endpoints
+  - name: Users
+    description: User management operations
+  - name: Jobs
+    description: Job listing operations
+  - name: Applications
+    description: Job application management
+  - name: Companies
+    description: Company profile operations
+  - name: Skills
+    description: Skills and categories
+  - name: Notifications
+    description: User notifications
+  - name: Reviews
+    description: Reviews and ratings
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Jobs
+      summary: Create a new job posting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobInput'
+      responses:
+        '201':
+          description: Job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /jobs/{id}:
+    get:
+      tags:
+        - Jobs
+      summary: Get job details
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Jobs
+      summary: Update job posting
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobInput'
+      responses:
+        '200':
+          description: Job updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Jobs
+      summary: Delete job posting
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '204':
+          description: Job deleted successfully
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /jobs/{id}/apply:
+    post:
+      tags:
+        - Applications
+      summary: Apply to a job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - cover_letter
+                - resume
+              properties:
+                cover_letter:
+                  type: string
+                  description: Cover letter text
+                resume:
+                  type: string
+                  format: binary
+                  description: Resume file (PDF, DOC, DOCX)
+      responses:
+        '201':
+          description: Application submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Already applied to this job
+
+  /jobs/search:
+    get:
+      tags:
+        - Jobs
+      summary: Advanced job search
+      parameters:
+        - name: q
+          in: query
+          description: Search query
+          required: true
+          schema:
+            type: string
+            example: software engineer
+        - name: location
+          in: query
+          description: Location search
+          schema:
+            type: string
+            example: Nairobi
+        - name: radius
+          in: query
+          description: Search radius
+          schema:
+            type: string
+            example: 50km
+        - name: skills
+          in: query
+          description: Required skills (comma-separated)
+          schema:
+            type: string
+            example: python,django,postgresql
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+                  meta:
+                    allOf:
+                      - $ref: '#/components/schemas/PaginationMeta'
+                      - type: object
+                        properties:
+                          total_results:
+                            type: integer
+                          search_query:
+                            type: string
+
+  /applications:
+    get:
+      tags:
+        - Applications
+      summary: List user's applications
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          description: Filter by application status
+          schema:
+            type: string
+            enum: [submitted, reviewing, shortlisted, rejected, hired]
+      responses:
+        '200':
+          description: List of applications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Application'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /companies:
+    get:
+      tags:
+        - Companies
+      summary: List all companies
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: industry
+          in: query
+          description: Filter by industry
+          schema:
+            type: string
+        - name: verified
+          in: query
+          description: Filter by verification status
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Company'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags:
+        - Companies
+      summary: Register a new company
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyInput'
+      responses:
+        '201':
+          description: Company created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: List user notifications
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: read
+          in: query
+          description: Filter by read status
+          schema:
+            type: boolean
+        - name: type
+          in: query
+          description: Filter by notification type
+          schema:
+            type: string
+            enum: [application_update, job_match, message, system]
+      responses:
+        '200':
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+                  meta:
+                    allOf:
+                      - $ref: '#/components/schemas/PaginationMeta'
+                      - type: object
+                        properties:
+                          unread_count:
+                            type: integer
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    JobId:
+      name: id
+      in: path
+      required: true
+      description: Job ID
+      schema:
+        type: string
+        format: uuid
+
+    PageParam:
+      name: page
+      in: query
+      description: Page number
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    SortParam:
+      name: sort
+      in: query
+      description: Sort field (prefix with - for DESC)
+      schema:
+        type: string
+        example: -posted_at
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        user_type:
+          type: string
+          enum: [job_seeker, employer, admin]
+        profile_picture_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        email_verified:
+          type: boolean
+        phone_verified:
+          type: boolean
+        preferred_language:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        company:
+          $ref: '#/components/schemas/Company'
+        location:
+          $ref: '#/components/schemas/JobLocation'
+        salary:
+          $ref: '#/components/schemas/Salary'
+        employment_type:
+          type: string
+          enum: [full_time, part_time, contract, internship]
+        experience_level:
+          type: string
+          enum: [entry, mid, senior, executive]
+        skills_required:
+          type: array
+          items:
+            type: string
+        education_requirements:
+          type: object
+        posted_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [draft, active, closed, expired]
+        application_count:
+          type: integer
+
+    JobInput:
+      type: object
+      required:
+        - title
+        - description
+        - location
+        - employment_type
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          $ref: '#/components/schemas/JobLocation'
+        salary:
+          $ref: '#/components/schemas/Salary'
+        employment_type:
+          type: string
+          enum: [full_time, part_time, contract, internship]
+        experience_level:
+          type: string
+          enum: [entry, mid, senior, executive]
+        skills_required:
+          type: array
+          items:
+            type: string
+        education_requirements:
+          type: object
+        expires_at:
+          type: string
+          format: date-time
+
+    Application:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job:
+          $ref: '#/components/schemas/Job'
+        applicant:
+          $ref: '#/components/schemas/User'
+        cover_letter:
+          type: string
+        resume_url:
+          type: string
+          format: uri
+        status:
+          type: string
+          enum: [submitted, reviewing, shortlisted, rejected, hired]
+        applied_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        industry:
+          type: string
+        size:
+          type: string
+          enum: ['1-10', '11-50', '51-200', '201-500', '500+']
+        website:
+          type: string
+          format: uri
+        logo_url:
+          type: string
+          format: uri
+        verified:
+          type: boolean
+        location:
+          type: object
+          properties:
+            headquarters:
+              $ref: '#/components/schemas/Location'
+            offices:
+              type: array
+              items:
+                $ref: '#/components/schemas/Location'
+        created_at:
+          type: string
+          format: date-time
+
+    CompanyInput:
+      type: object
+      required:
+        - name
+        - industry
+        - size
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        industry:
+          type: string
+        size:
+          type: string
+          enum: ['1-10', '11-50', '51-200', '201-500', '500+']
+        website:
+          type: string
+          format: uri
+        location:
+          type: object
+          properties:
+            headquarters:
+              $ref: '#/components/schemas/Location'
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [application_update, job_match, message, system]
+        title:
+          type: string
+        content:
+          type: string
+        read:
+          type: boolean
+        action_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+        channels:
+          type: array
+          items:
+            type: string
+            enum: [email, sms, push]
+
+    Location:
+      type: object
+      properties:
+        country:
+          type: string
+        city:
+          type: string
+        region:
+          type: string
+
+    JobLocation:
+      allOf:
+        - $ref: '#/components/schemas/Location'
+        - type: object
+          properties:
+            remote_options:
+              type: string
+              enum: [onsite, remote, hybrid]
+
+    Salary:
+      type: object
+      properties:
+        min:
+          type: number
+        max:
+          type: number
+        currency:
+          type: string
+        period:
+          type: string
+          enum: [hourly, monthly, yearly]
+
+    AuthToken:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          default: Bearer
+        expires_in:
+          type: integer
+          example: 3600
+        refresh_token:
+          type: string
+        scope:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+            timestamp:
+              type: string
+              format: date-time
+            request_id:
+              type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        total_pages:
+          type: integer
+        total_items:
+          type: integer
+        items_per_page:
+          type: integer
+
+    PaginationLinks:
+      type: object
+      properties:
+        first:
+          type: string
+          format: uri
+        last:
+          type: string
+          format: uri
+        prev:
+          type: string
+          format: uri
+          nullable: true
+        next:
+          type: string
+          format: uri
+          nullable: true
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid request parameters
+              details:
+                field: email
+                reason: Invalid email format
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: AUTH_FAILED
+              message: Invalid or expired token
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INSUFFICIENT_PERMISSIONS
+              message: You do not have permission to perform this action
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RESOURCE_NOT_FOUND
+              message: The requested resource was not found
+
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: DUPLICATE_RESOURCE
+              message: A resource with this identifier already exists
+      tags:
+        - Authentication
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - first_name
+                - last_name
+                - user_type
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecurePass123!
+                first_name:
+                  type: string
+                  example: John
+                last_name:
+                  type: string
+                  example: Doe
+                user_type:
+                  type: string
+                  enum: [job_seeker, employer]
+                  example: job_seeker
+                phone:
+                  type: string
+                  example: "+254712345678"
+                preferred_language:
+                  type: string
+                  example: en
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /jobs:
+    get:
+      tags:
+        - Jobs
+      summary: List all jobs
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: location.country
+          in: query
+          description: Filter by country code
+          schema:
+            type: string
+            example: KE
+        - name: location.city
+          in: query
+          description: Filter by city
+          schema:
+            type: string
+            example: Nairobi
+        - name: salary.min
+          in: query
+          description: Minimum salary
+          schema:
+            type: integer
+            example: 50000
+        - name: employment_type
+          in: query
+          description: Employment type filter
+          schema:
+            type: string
+            enum: [full_time, part_time, contract, internship]
+        - name: experience_level
+          in: query
+          description: Experience level filter
+          schema:
+            type: string
+            enum: [entry, mid, senior, executive]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  links:
+                    $ref: '#/components/schemas/PaginationLinks'
+
+    post:
